@@ -23,7 +23,9 @@ app.get('/getmap', (req, res) => {
             console.error("Error reading database:", err);
             return res.status(500).json({ error: 'Could not read from database.' }); 
         }
-        res.status(200).json(JSON.parse(data));
+        // FIX: Handle case where file might be empty on first read
+        const jsonData = data ? JSON.parse(data) : [];
+        res.status(200).json(jsonData);
     });
 });
 
@@ -56,7 +58,15 @@ app.get('/givedata', (req, res) => {
                 return res.status(500).json({ error: 'Could not read database to save new point.' });
             }
 
-            const database = JSON.parse(data);
+            let database;
+            try {
+                // FIX: If the file is empty (data is an empty string), initialize an empty array.
+                database = data ? JSON.parse(data) : [];
+            } catch (parseErr) {
+                console.error("Error parsing JSON from database.json:", parseErr);
+                return res.status(500).json({error: "Could not parse database file. The file might be corrupt."});
+            }
+
             database.push(newEntry);
 
             // 4. Write the updated data back to the file
