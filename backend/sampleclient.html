@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test Client</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f2f5;
+            margin: 0;
+            flex-direction: column;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #response {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre-wrap;
+            width: 80%;
+            max-width: 500px;
+        }
+    </style>
+</head>
+<body>
+
+    <button id="sendRequestBtn">Send POST Request to Server</button>
+    <div id="response">Server response will appear here...</div>
+
+    <script>
+        // Find the button and the response div in the HTML
+        const sendButton = document.getElementById('sendRequestBtn');
+        const responseDiv = document.getElementById('response');
+
+        // Define the function that will send the data
+        async function sendDataToServer() {
+            // 1. The URL of your server's endpoint
+            const url = 'http://10.6.116.54:6969/getmap';
+
+            // 2. The sensitive data you want to send
+            const dataToSend = {
+                username: 'alex_hackathon',
+                secretKey: 'super_secret_value_12345',
+                timestamp: new Date().toISOString()
+            };
+
+            console.log('Sending this data to the server:', dataToSend);
+            responseDiv.textContent = 'Sending request...';
+
+            try {
+                // 3. Use the fetch API to make the POST request
+                const response = await fetch(url, {
+                    method: 'POST', // Specify the method
+                    headers: {
+                        // Tell the server we're sending JSON
+                        'Content-Type': 'application/json'
+                    },
+                    // Convert the JavaScript object to a JSON string for the body
+                    body: JSON.stringify(dataToSend)
+                });
+
+                // 4. Wait for the server's response and parse it as JSON
+                const responseData = await response.json();
+                
+                console.log('Received response from server:', responseData);
+                // Display the server's response in a readable format
+                responseDiv.textContent = JSON.stringify(responseData, null, 2);
+
+            } catch (error) {
+                console.error('Failed to send request:', error);
+                responseDiv.textContent = 'Error: Could not connect to the server. Is it running?';
+            }
+        }
+
+        // 5. Add a click event listener to the button
+        sendButton.addEventListener('click', sendDataToServer);
+    </script>
+
+</body>
+</html>
