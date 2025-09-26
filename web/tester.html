@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Decibel Meter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .transition-all {
+            transition: all 0.3s ease-in-out;
+        }
+        input:disabled, button:disabled {
+            background-color: #6b7280; /* gray-500 */
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md p-6 sm:p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg space-y-6">
+        
+        <div class="text-center">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Decibel Meter</h1>
+            <p class="text-gray-500 dark:text-gray-400 mt-2">Measure sound levels around you.</p>
+        </div>
+
+        <div class="flex items-baseline justify-center bg-gray-100 dark:bg-gray-700 rounded-xl p-6">
+            <div id="decibel-level" class="text-6xl sm:text-7xl font-bold text-blue-600 dark:text-blue-400">--</div>
+            <div class="text-lg text-gray-600 dark:text-gray-300 ml-2">dB</div>
+        </div>
+        
+        <div class="grid grid-cols-3 gap-4">
+            <div class="flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-xl p-4">
+                <div id="raw-decibel-level" class="text-4xl font-bold text-yellow-500 dark:text-yellow-400">--</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">Raw</div>
+            </div>
+            <div class="flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-xl p-4">
+                <div id="avg-decibel-level" class="text-4xl font-bold text-green-600 dark:text-green-400">--</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">Avg</div>
+            </div>
+            <div class="flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-xl p-4">
+                <div id="max-decibel-level" class="text-4xl font-bold text-red-600 dark:text-red-400">--</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">Max</div>
+            </div>
+        </div>
+
+        <div class="text-center text-sm text-gray-500 dark:text-gray-400" id="status-display">
+            Click "Start" to begin measurement.
+        </div>
+        <div class="text-center text-xs text-gray-400 dark:text-gray-500" id="location-display">
+            Location: Not available
+        </div>
+
+        <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+            <button id="toggle-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 transition-all text-lg">
+                Start Measurement
+            </button>
+            <button id="calibrate-button" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-4 focus:ring-indigo-300 dark:focus:ring-indigo-800 transition-all text-lg" disabled>
+                Calibrate
+            </button>
+        </div>
+
+        <!-- Settings Section -->
+        <div class="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div>
+                <label for="gain-slider" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white flex justify-between">Gain <span id="gain-value">1.0x</span></label>
+                <input id="gain-slider" type="range" min="1" max="10" value="1" step="0.5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-600" disabled>
+            </div>
+            <div>
+                <label for="baseline-input" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Baseline Adjustment (dB)</label>
+                <input id="baseline-input" type="number" value="0" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white" disabled>
+            </div>
+        </div>
+
+        <div>
+            <label for="json-output" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Data to Send</label>
+            <pre id="json-output" class="w-full h-40 p-4 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-xs overflow-auto"><code>{}</code></pre>
+        </div>
+
+        <button id="send-data-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-4 focus:ring-green-300 dark:focus:ring-green-800 transition-all text-lg" disabled>
+            Send Data Instance
+        </button>
+    </div>
+
+    <script>
+        const toggleButton = document.getElementById('toggle-button');
+        const calibrateButton = document.getElementById('calibrate-button');
+        const decibelDisplay = document.getElementById('decibel-level');
+        const avgDecibelDisplay = document.getElementById('avg-decibel-level');
+        const maxDecibelDisplay = document.getElementById('max-decibel-level');
+        const rawDecibelDisplay = document.getElementById('raw-decibel-level'); // New element
+        const sendDataButton = document.getElementById('send-data-button'); // New element
+        const statusDisplay = document.getElementById('status-display');
+        const locationDisplay = document.getElementById('location-display');
+        const jsonOutput = document.querySelector('#json-output code');
+        
+        const gainSlider = document.getElementById('gain-slider');
+        const gainValueDisplay = document.getElementById('gain-value');
+        const baselineInput = document.getElementById('baseline-input');
+
+        let audioContext, analyser, mediaStreamSource, gainNode;
+        let animationFrameId;
+        let isRecording = false;
+        let locationData = null;
+
+        let frameCount = 0;
+        const UPDATE_FREQUENCY = 5;
+        let isCalibrating = false;
+        let calibrationBaseline = 0;
+        let calibrationReadings = [];
+        const CALIBRATION_SAMPLES = 100;
+
+        let decibelHistory = [];
+        let maxDecibel = 0;
+        const HISTORY_SIZE = 50; 
+
+        function onLocationSuccess(position) {
+            locationData = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+            };
+            locationDisplay.textContent = `Location: ${locationData.latitude.toFixed(4)}, ${locationData.longitude.toFixed(4)}`;
+            statusDisplay.textContent = 'Location found. Ready to start.';
+        }
+
+        function onLocationError(error) {
+            statusDisplay.textContent = `Error getting location: ${error.message}`;
+            locationDisplay.textContent = 'Location: Not available (using defaults)';
+            locationData = { latitude: 0, longitude: 0 }; 
+        }
+
+        function getInitialLocation() {
+            if (navigator.geolocation) {
+                statusDisplay.textContent = 'Getting your location...';
+                navigator.geolocation.getCurrentPosition(onLocationSuccess, onLocationError);
+            } else {
+                statusDisplay.textContent = 'Geolocation is not supported by your browser.';
+                locationData = { latitude: 0, longitude: 0 };
+            }
+        }
+
+        function updateDecibels() {
+            if (!isRecording) return;
+
+            frameCount++;
+            if (frameCount % UPDATE_FREQUENCY !== 0) {
+                animationFrameId = requestAnimationFrame(updateDecibels);
+                return;
+            }
+
+            const dataArray = new Uint8Array(analyser.fftSize);
+            analyser.getByteTimeDomainData(dataArray);
+
+            let sumSquares = 0.0;
+            for (const amplitude of dataArray) {
+                const sample = (amplitude / 128.0) - 1.0; 
+                sumSquares += sample * sample;
+            }
+
+            const rms = Math.sqrt(sumSquares / dataArray.length);
+            
+            let rawDb = 0;
+            if (rms > 0) {
+                const dbfs = 20 * Math.log10(rms);
+                rawDb = Math.max(0, Math.round(dbfs + 100));
+            }
+
+            rawDecibelDisplay.textContent = rawDb; // Update the raw display
+            
+            if (isCalibrating) {
+                calibrationReadings.push(rawDb);
+                statusDisplay.textContent = `Calibrating... ${calibrationReadings.length}%`;
+                if (calibrationReadings.length >= CALIBRATION_SAMPLES) {
+                    const sum = calibrationReadings.reduce((a, b) => a + b, 0);
+                    calibrationBaseline = Math.round(sum / calibrationReadings.length);
+                    baselineInput.value = calibrationBaseline; 
+                    isCalibrating = false;
+                    statusDisplay.textContent = 'Recording...';
+                    calibrateButton.disabled = false;
+                }
+            }
+
+            const calibratedDb = Math.max(0, rawDb - calibrationBaseline);
+            decibelDisplay.textContent = calibratedDb;
+
+            decibelHistory.push(calibratedDb);
+            if (decibelHistory.length > HISTORY_SIZE) decibelHistory.shift();
+
+            const sum = decibelHistory.reduce((a, b) => a + b, 0);
+            const avg = decibelHistory.length > 0 ? Math.round(sum / decibelHistory.length) : 0;
+            avgDecibelDisplay.textContent = avg;
+
+            if (calibratedDb > maxDecibel) maxDecibel = calibratedDb;
+            maxDecibelDisplay.textContent = maxDecibel;
+
+            updateJsonOutput(rawDb, calibratedDb, avg, maxDecibel);
+
+            animationFrameId = requestAnimationFrame(updateDecibels);
+        }
+
+        function updateJsonOutput(raw, current, average, max) {
+            const data = {
+                timestamp: new Date().toISOString(),
+                location: locationData,
+                decibel: {
+                    raw: raw,
+                    current: current,
+                    average: average,
+                    max: max,
+                    baseline: calibrationBaseline,
+                    gain: gainNode ? gainNode.gain.value : 1
+                }
+            };
+            jsonOutput.textContent = JSON.stringify(data, null, 2);
+        }
+        
+        async function sendDataToServer() {
+            if (!isRecording) return;
+            const jsonData = jsonOutput.textContent;
+            const originalStatus = statusDisplay.textContent;
+            statusDisplay.textContent = 'Sending data...';
+            sendDataButton.disabled = true;
+
+            try {
+                // Using httpbin.org/post as a test endpoint. It echoes back the data sent.
+                const response = await fetch('http://127.0.0.1:6969', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: jsonData
+                });
+                
+                if (response.ok) {
+                    statusDisplay.textContent = 'Data sent successfully!';
+                    console.log('Success:', await response.json());
+                } else {
+                    statusDisplay.textContent = `Error sending: ${response.statusText}`;
+                }
+            } catch (error) {
+                statusDisplay.textContent = 'Network error. See console.';
+                console.error('Error sending data:', error);
+            }
+            
+            setTimeout(() => {
+                if (isRecording) {
+                    statusDisplay.textContent = originalStatus;
+                    sendDataButton.disabled = false;
+                }
+            }, 2000);
+        }
+
+        function calibrateMicrophone() {
+            if (!isRecording) return;
+            isCalibrating = true;
+            calibrationReadings = [];
+            statusDisplay.textContent = 'Calibrating... Please be quiet.';
+            calibrateButton.disabled = true;
+        }
+
+        async function startRecording() {
+            if (!locationData) {
+                statusDisplay.textContent = 'Please wait, getting location...';
+                getInitialLocation();
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                gainNode = audioContext.createGain();
+                
+                mediaStreamSource = audioContext.createMediaStreamSource(stream);
+                mediaStreamSource.connect(gainNode);
+                gainNode.connect(analyser);
+
+                isRecording = true;
+                decibelHistory = [];
+                maxDecibel = 0;
+                calibrationBaseline = parseInt(baselineInput.value, 10) || 0;
+                gainSlider.value = 1;
+                gainNode.gain.value = 1;
+                gainValueDisplay.textContent = '1.0x';
+
+                rawDecibelDisplay.textContent = '--';
+                avgDecibelDisplay.textContent = '--';
+                maxDecibelDisplay.textContent = '--';
+
+                statusDisplay.textContent = 'Recording...';
+                toggleButton.textContent = 'Stop Measurement';
+                toggleButton.classList.replace('bg-blue-600', 'bg-red-600');
+                
+                calibrateButton.disabled = false;
+                gainSlider.disabled = false;
+                baselineInput.disabled = false;
+                sendDataButton.disabled = false;
+
+                window.localStream = stream;
+                updateDecibels();
+            } catch (err) {
+                statusDisplay.textContent = `Error accessing microphone: ${err.message}`;
+            }
+        }
+
+        function stopRecording() {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            if (window.localStream) window.localStream.getTracks().forEach(track => track.stop());
+            if(mediaStreamSource) mediaStreamSource.disconnect();
+            if (audioContext && audioContext.state !== 'closed') audioContext.close();
+
+            isRecording = false;
+            statusDisplay.textContent = 'Click "Start" to begin measurement.';
+            toggleButton.textContent = 'Start Measurement';
+            toggleButton.classList.replace('bg-red-600', 'bg-blue-600');
+            
+            calibrateButton.disabled = true;
+            gainSlider.disabled = true;
+            baselineInput.disabled = true;
+            sendDataButton.disabled = true;
+
+            decibelDisplay.textContent = '--';
+            avgDecibelDisplay.textContent = '--';
+            maxDecibelDisplay.textContent = '--';
+            rawDecibelDisplay.textContent = '--';
+        }
+
+        toggleButton.addEventListener('click', () => { isRecording ? stopRecording() : startRecording(); });
+        calibrateButton.addEventListener('click', calibrateMicrophone);
+        sendDataButton.addEventListener('click', sendDataToServer);
+
+        gainSlider.addEventListener('input', (e) => {
+            const gainVal = parseFloat(e.target.value);
+            if (gainNode) gainNode.gain.value = gainVal;
+            gainValueDisplay.textContent = `${gainVal.toFixed(1)}x`;
+        });
+        
+        baselineInput.addEventListener('input', (e) => {
+            calibrationBaseline = parseInt(e.target.value, 10) || 0;
+        });
+
+        window.addEventListener('load', getInitialLocation);
+    </script>
+</body>
+</html>
+
