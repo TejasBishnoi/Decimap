@@ -69,6 +69,11 @@
 
         <!-- Settings Section -->
         <div class="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <!-- NEW: Server URL Input -->
+            <div>
+                <label for="server-url-input" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Server URL</label>
+                <input id="server-url-input" type="text" value="http://127.0.0.1:6969/givedata" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+            </div>
             <div>
                 <label for="gain-slider" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white flex justify-between">Gain <span id="gain-value">1.0x</span></label>
                 <input id="gain-slider" type="range" min="1" max="10" value="1" step="0.5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-600" disabled>
@@ -95,8 +100,8 @@
         const decibelDisplay = document.getElementById('decibel-level');
         const avgDecibelDisplay = document.getElementById('avg-decibel-level');
         const maxDecibelDisplay = document.getElementById('max-decibel-level');
-        const rawDecibelDisplay = document.getElementById('raw-decibel-level'); // New element
-        const sendDataButton = document.getElementById('send-data-button'); // New element
+        const rawDecibelDisplay = document.getElementById('raw-decibel-level');
+        const sendDataButton = document.getElementById('send-data-button');
         const statusDisplay = document.getElementById('status-display');
         const locationDisplay = document.getElementById('location-display');
         const jsonOutput = document.querySelector('#json-output code');
@@ -104,6 +109,7 @@
         const gainSlider = document.getElementById('gain-slider');
         const gainValueDisplay = document.getElementById('gain-value');
         const baselineInput = document.getElementById('baseline-input');
+        const serverUrlInput = document.getElementById('server-url-input'); // Get the new input
 
         let audioContext, analyser, mediaStreamSource, gainNode;
         let animationFrameId;
@@ -172,7 +178,7 @@
                 rawDb = Math.max(0, Math.round(dbfs + 100));
             }
 
-            rawDecibelDisplay.textContent = rawDb; // Update the raw display
+            rawDecibelDisplay.textContent = rawDb;
             
             if (isCalibrating) {
                 calibrationReadings.push(rawDb);
@@ -228,9 +234,11 @@
             statusDisplay.textContent = 'Sending data...';
             sendDataButton.disabled = true;
 
+            // UPDATED: Get URL from the input field
+            const serverUrl = serverUrlInput.value;
+
             try {
-                // Using httpbin.org/post as a test endpoint. It echoes back the data sent.
-                const response = await fetch('http://127.0.0.1:6969', {
+                const response = await fetch(serverUrl, { // Use the dynamic URL
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: jsonData
@@ -240,7 +248,7 @@
                     statusDisplay.textContent = 'Data sent successfully!';
                     console.log('Success:', await response.json());
                 } else {
-                    statusDisplay.textContent = `Error sending: ${response.statusText}`;
+                    statusDisplay.textContent = `Error sending: ${response.status} ${response.statusText}`;
                 }
             } catch (error) {
                 statusDisplay.textContent = 'Network error. See console.';
@@ -302,6 +310,7 @@
                 gainSlider.disabled = false;
                 baselineInput.disabled = false;
                 sendDataButton.disabled = false;
+                serverUrlInput.disabled = true; // Disable URL input during recording
 
                 window.localStream = stream;
                 updateDecibels();
@@ -314,7 +323,7 @@
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             if (window.localStream) window.localStream.getTracks().forEach(track => track.stop());
             if(mediaStreamSource) mediaStreamSource.disconnect();
-            if (audioContext && audioContext.state !== 'closed') audioContext.close();
+            if (audioContext && audioContext.state !== 'closed') audio-Context.close();
 
             isRecording = false;
             statusDisplay.textContent = 'Click "Start" to begin measurement.';
@@ -325,6 +334,7 @@
             gainSlider.disabled = true;
             baselineInput.disabled = true;
             sendDataButton.disabled = true;
+            serverUrlInput.disabled = false; // Re-enable URL input
 
             decibelDisplay.textContent = '--';
             avgDecibelDisplay.textContent = '--';
@@ -350,4 +360,3 @@
     </script>
 </body>
 </html>
-
