@@ -49,6 +49,18 @@
             height: 50px;
             z-index: 1100;
         }
+        .legend {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+        }
+        .legend i {
+            width: 20px;
+            height: 20px;
+            float: left;
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
@@ -89,11 +101,6 @@
             <button onclick="addCustomLocation()">Add Custom POI</button>
         </div>
         <div>
-            <h3>Upload JSON Data</h3>
-            <label for="jsonFile">Upload JSON File:</label>
-            <input type="file" id="jsonFile" accept=".json" onchange="loadJsonData()" />
-        </div>
-        <div>
             <label for="noiseFilter">Max Noise Level (dB):</label>
             <input type="range" id="noiseFilter" min="0" max="100" value="100" oninput="updateNoiseFilter()" />
             <span id="noiseValue">100</span>
@@ -119,11 +126,21 @@
         const AMITY_LAT = 28.3185;
         const AMITY_LNG = 76.9137;
 
-        // Initialize the map to show all of India
+        // Initialize the map centered on India
         let map = L.map('map').setView([21.7679, 78.9629], 5);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
+
+        // Restrict map to India bounds
+        const indiaBounds = L.latLngBounds(
+            L.latLng(6.74678, 68.16239), // Southwest
+            L.latLng(35.6745, 97.39556) // Northeast
+        );
+        map.setMaxBounds(indiaBounds);
+        map.on('drag', function() {
+            map.panInsideBounds(indiaBounds, { animate: false });
+        });
 
         // Current marker
         let currentMarker = null;
@@ -143,7 +160,7 @@
         let heatLayer = null;
         let heatPoints = [];
 
-        // Generate initial noise points for heatmap
+        // Generate simulated noise points for heatmap
         function generateNoisePoints(centerLat, centerLng, count, radius) {
             const points = [];
             for (let i = 0; i < count; i++) {
@@ -160,7 +177,11 @@
         }
 
         heatPoints = generateNoisePoints(21.7679, 78.9629, 100, 1000);
-        heatLayer = L.heatLayer(heatPoints, { radius: 25, maxZoom: 10 }).addTo(map);
+        heatLayer = L.heatLayer(heatPoints, {
+            radius: 25,
+            maxZoom: 10,
+            gradient: { 0.4: 'green', 0.6: 'yellow', 0.8: 'red' } // Smooth color blending
+        }).addTo(map);
 
         // Add POI markers
         function addPOIMarkers() {
@@ -181,77 +202,90 @@
             .bindPopup('Amity University Haryana, Gurugram')
             .openPopup();
 
-        // Load JSON data
-        function loadJsonData() {
-            const fileInput = document.getElementById('jsonFile');
-            const file = fileInput.files[0];
-            if (!file) {
-                alert('Please select a JSON file.');
-                return;
+        // Heatmap legend
+        var legend = L.control({ position: 'bottomright' });
+        legend.onAdd = function (map) {
+            var div = L.DomUtil.create('div', 'legend');
+            var grades = [50, 60, 70, 80];
+            var colors = ['green', 'yellow', 'orange', 'red'];
+            div.innerHTML = '<h4>Noise Levels (dB)</h4>';
+            for (var i = 0; i < grades.length; i++) {
+                div.innerHTML +=
+                    '<i style="background:' + colors[i] + '"></i> ' +
+                    grades[i] + (grades[i + 1] ? '&ndash;' + grades[i + 1] + '<br>' : '+');
             }
+            return div;
+        };
+        legend.addTo(map);
 
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    if (!Array.isArray(data)) {
-                        alert('JSON must be an array of location objects.');
+        // Function to process JSON data (for backend integration)
+        // Example: Call loadJsonDataFromBackend() when backend data is available
+        function loadJsonData(jsonData) {
+            try {
+                const data = JSON.parse(jsonData); // Or receive as object from backend
+                if (!Array.isArray(data)) {
+                    console.error('JSON must be an array of location objects.');
+                    return;
+                }
+
+                let invalidEntries = [];
+                data.forEach((entry, index) => {
+                    const lat = parseFloat(entry.latitude);
+                    const lng = parseFloat(entry.longitude);
+                    const noise = parseFloat(entry.noise);
+                    const name = entry.userId ? `${entry.userId}'s Location` : `Location ${index + 1}`;
+                    if (isNaN(lat) || lat < -90 || lat > 90 ||
+                        isNaN(lng) || lng < -180 || lng > 180 ||
+                        isNaN(noise) || noise < 0 || noise > 100) {
+                        invalidEntries.push(index + 1);
                         return;
                     }
 
-                    let invalidEntries = [];
-                    data.forEach((entry, index) => {
-                        const lat = parseFloat(entry.latitude);
-                        const lng = parseFloat(entry.longitude);
-                        const noise = parseFloat(entry.noise);
-                        const name = entry.userId ? `${entry.userId}'s Location` : `Location ${index + 1}`;
-                        if (isNaN(lat) || lat < -90 || lat > 90 ||
-                            isNaN(lng) || lng < -180 || lng > 180 ||
-                            isNaN(noise) || noise < 0 || noise > 100) {
-                            invalidEntries.push(index + 1);
-                            return;
-                        }
+                    const poi = {
+                        lat,
+                        lng,
+                        name,
+                        noise,
+                        userId: entry.userId || 'Unknown',
+                        date: entry.date || 'N/A',
+                        time: entry.time || 'N/A'
+                    };
+                    pois.push(poi);
+                    heatPoints.push([lat, lng, noise / 100]);
+                });
 
-                        const poi = {
-                            lat,
-                            lng,
-                            name,
-                            noise,
-                            userId: entry.userId || 'Unknown',
-                            date: entry.date || 'N/A',
-                            time: entry.time || 'N/A'
-                        };
-                        pois.push(poi);
-                        heatPoints.push([lat, lng, noise / 100]);
-                    });
-
-                    if (invalidEntries.length > 0) {
-                        alert(`Skipped invalid entries at indices: ${invalidEntries.join(', ')}. Ensure latitude (-90 to 90), longitude (-180 to 180), and noise (0-100) are valid.`);
-                    }
-
-                    // Update heatmap
-                    if (map.hasLayer(heatLayer)) {
-                        map.removeLayer(heatLayer);
-                    }
-                    heatLayer = L.heatLayer(heatPoints, { radius: 25, maxZoom: 10 });
-                    if (document.getElementById('heatToggle').checked) {
-                        map.addLayer(heatLayer);
-                    }
-
-                    // Update POIs
-                    poiLayer.clearLayers();
-                    poiMarkers = {};
-                    addPOIMarkers();
-                    updateNoiseFilter();
-
-                    // Reset file input
-                    fileInput.value = '';
-                } catch (error) {
-                    alert('Error parsing JSON file: ' + error.message);
+                if (invalidEntries.length > 0) {
+                    alert(`Skipped invalid entries at indices: ${invalidEntries.join(', ')}. Ensure latitude (-90 to 90), longitude (-180 to 180), and noise (0-100) are valid.`);
                 }
-            };
-            reader.readAsText(file);
+
+                // Update heatmap
+                if (map.hasLayer(heatLayer)) {
+                    map.removeLayer(heatLayer);
+                }
+                heatLayer = L.heatLayer(heatPoints, {
+                    radius: 25,
+                    maxZoom: 10,
+                    gradient: { 0.4: 'green', 0.6: 'yellow', 0.8: 'red' }
+                });
+                if (document.getElementById('heatToggle').checked) {
+                    map.addLayer(heatLayer);
+                }
+
+                // Update POIs
+                poiLayer.clearLayers();
+                poiMarkers = {};
+                addPOIMarkers();
+                updateNoiseFilter();
+            } catch (error) {
+                console.error('Error processing JSON data: ' + error.message);
+            }
         }
+
+        // Example backend call (uncomment and adapt for actual backend)
+        // fetch('backend/url/for/json')
+        //     .then(response => response.json())
+        //     .then(data => loadJsonData(JSON.stringify(data)))
+        //     .catch(error => console.error('Backend fetch error:', error));
 
         // Pin location on right-click
         map.on('contextmenu', function(e) {
@@ -279,7 +313,11 @@
             heatPoints.push([lat, lng, noise / 100]);
             if (map.hasLayer(heatLayer)) {
                 map.removeLayer(heatLayer);
-                heatLayer = L.heatLayer(heatPoints, { radius: 25, maxZoom: 10 });
+                heatLayer = L.heatLayer(heatPoints, {
+                    radius: 25,
+                    maxZoom: 10,
+                    gradient: { 0.4: 'green', 0.6: 'yellow', 0.8: 'red' }
+                });
                 if (document.getElementById('heatToggle').checked) {
                     map.addLayer(heatLayer);
                 }
