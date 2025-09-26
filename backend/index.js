@@ -1,5 +1,5 @@
 const express = require("express");
-const fs = require('fs');
+const fs = require('fs').promises; // Using the promises version of fs
 const path = require('path');
 const { randomUUID } = require('crypto');
 
@@ -7,103 +7,173 @@ const app = express();
 const port = 6969;
 const dbPath = path.join(__dirname, 'database.json');
 
-// Middleware to parse JSON for other routes if needed in the future
+// --- Helper Functions ---
+
+/**
+ * Reads and parses the JSON database file.
+ * @returns {Promise<Array>} A promise that resolves to an array of database entries.
+ */
+async function readDatabase() {
+    try {
+        const data = await fs.readFile(dbPath, 'utf8');
+        // If the file is empty, return an empty array to prevent JSON.parse errors
+        return data ? JSON.parse(data) : [];
+    } catch (error) {
+        // If the file doesn't exist, it's not an error; we'll create it on the first write.
+        if (error.code === 'ENOENT') {
+            return [];
+        }
+        // For any other errors (e.g., corrupt file), throw the error.
+        console.error("Error reading or parsing database:", error);
+        throw new Error('Could not read the database.');
+    }
+}
+
+/**
+ * Writes an array of data to the JSON database file.
+ * @param {Array} data The data to write to the file.
+ * @returns {Promise<void>}
+ */
+async function writeDatabase(data) {
+    try {
+        await fs.writeFile(dbPath, JSON.stringify(data, null, 2));
+    } catch (error) {
+        console.error("Error writing to database:", error);
+        throw new Error('Could not write to the database.');
+    }
+}
+
+/**
+ * Calculates the distance between two points on Earth in miles using the Haversine formula.
+ * @param {number} lat1 Latitude of point 1
+ * @param {number} lon1 Longitude of point 1
+ * @param {number} lat2 Latitude of point 2
+ * @param {number} lon2 Longitude of point 2
+ * @returns {number} The distance in miles
+ */
+function getDistanceInMiles(lat1, lon1, lat2, lon2) {
+    const R = 3959; // Radius of the Earth in miles
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+
+// --- Middleware ---
 app.use(express.json());
 
-app.get("/lol", (req,res) =>{
-    const imagePath = path.join(__dirname, 'meme.jpg');
-    // Check if the file exists before trying to send it
-    fs.access(imagePath, fs.constants.F_OK, (err) => {
-        if (err) {
-            console.log("Easter egg image not found!");
-            res.status(404).send("Oops, the easter egg is missing!");
-        } else {
-            res.sendFile(imagePath);
-        }
-    });
-});
 
-// A simple root route
+// --- Routes ---
+
 app.get('/', (req, res) => {
     res.send('Sure :)');
-    console.log("Got a request on `/`. Responded accordingly.");
 });
 
-// **RENAMED ROUTE**: This route now sends all data points to the client (e.g., for a heatmap)
-app.get('/getmap', (req, res) => {
-    fs.readFile(dbPath, 'utf8', (err, data) => {
-        if (err) { 
-            console.error("Error reading database:", err);
-            return res.status(500).json({ error: 'Could not read from database.' }); 
-        }
-        // FIX: Handle case where file might be empty on first read
-        const jsonData = data ? JSON.parse(data) : [];
-        res.status(200).json(jsonData);
-    });
+app.get("/lol", async (req, res) => {
+    const imagePath = path.join(__dirname, 'meme.jpg');
+    try {
+        await fs.access(imagePath);
+        res.sendFile(imagePath);
+    } catch {
+        res.status(404).send("Oops, the easter egg is missing!");
+    }
 });
 
-// **RENAMED ROUTE**: This route now receives data from a client and saves it
-app.get('/givedata', (req, res) => {
+// Sends all data points for the heatmap
+app.get('/getmap', async (req, res) => {
+    try {
+        const database = await readDatabase();
+        res.status(200).json(database);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Receives and saves new data from a client
+app.get('/givedata', async (req, res) => {
     const encryptedData = req.query.data;
     if (!encryptedData) {
         return res.status(400).json({ error: 'No data provided in the query.' });
     }
 
     try {
-        // 1. Decode and parse the data from the client
         const jsonString = Buffer.from(encryptedData, 'base64').toString('utf8');
         const clientData = JSON.parse(jsonString);
-        console.log('Decrypted User Data Received:', clientData);
-
-        // 2. Create the new entry for the database, adding a server-generated ID
+        
+        // Basic validation
+        if (!clientData.latitude || !clientData.longitude || !clientData.data) {
+            return res.status(400).json({ error: 'Missing required data fields (latitude, longitude, data).' });
+        }
+        
         const newEntry = {
             id: randomUUID(),
             latitude: clientData.latitude,
             longitude: clientData.longitude,
-            dataPoint: clientData.data, // Map 'data' from client to 'dataPoint' in the DB
-            timestamp: clientData.timestamp
+            dataPoint: clientData.data,
+            timestamp: clientData.timestamp || new Date().toISOString()
         };
 
-        // 3. Read the existing database file
-        fs.readFile(dbPath, 'utf8', (readErr, data) => {
-            if (readErr) {
-                console.error("Error reading database:", readErr);
-                return res.status(500).json({ error: 'Could not read database to save new point.' });
-            }
-
-            let database;
-            try {
-                // FIX: If the file is empty (data is an empty string), initialize an empty array.
-                database = data ? JSON.parse(data) : [];
-            } catch (parseErr) {
-                console.error("Error parsing JSON from database.json:", parseErr);
-                return res.status(500).json({error: "Could not parse database file. The file might be corrupt."});
-            }
-
-            database.push(newEntry);
-
-            // 4. Write the updated data back to the file
-            fs.writeFile(dbPath, JSON.stringify(database, null, 2), (writeErr) => {
-                if (writeErr) {
-                    console.error("Error writing to database:", writeErr);
-                    return res.status(500).json({ error: 'Could not save new point to database.' });
-                }
-
-                // 5. Send a success response after the data is saved
-                res.status(200).json({
-                    message: 'Data received and appended to database successfully!',
-                    appendedData: newEntry
-                });
-            });
+        const database = await readDatabase();
+        database.push(newEntry);
+        await writeDatabase(database);
+        
+        res.status(201).json({ // 201 Created is more appropriate here
+            message: 'Data received and saved successfully!',
+            savedData: newEntry
         });
 
     } catch (error) {
-        console.error("Failed to decode or parse data:", error);
-        res.status(500).json({ error: 'Invalid data format.' });
+        console.error("Error in /givedata route:", error);
+        res.status(500).json({ error: 'Failed to process request. Check if data is valid.' });
     }
 });
 
+// Finds the quietest point within a 5-mile radius
+app.get('/find-quietest-spot', async (req, res) => {
+    const { lat, lon } = req.query;
+
+    if (!lat || !lon) {
+        return res.status(400).json({ error: 'Latitude (lat) and longitude (lon) query parameters are required.' });
+    }
+
+    try {
+        const userLat = parseFloat(lat);
+        const userLon = parseFloat(lon);
+        const database = await readDatabase();
+        
+        let quietestPoint = null;
+        let minNoise = Infinity;
+
+        for (const point of database) {
+            const distance = getDistanceInMiles(userLat, userLon, point.latitude, point.longitude);
+            if (distance <= 5) {
+                const currentNoise = parseFloat(point.dataPoint);
+                if (!isNaN(currentNoise) && currentNoise < minNoise) {
+                    minNoise = currentNoise;
+                    quietestPoint = point;
+                }
+            }
+        }
+
+        if (quietestPoint) {
+            res.status(200).json({ message: 'Quietest location found.', location: quietestPoint });
+        } else {
+            res.status(404).json({ message: 'No data points found within a 5-mile radius.' });
+        }
+    } catch (error) {
+        console.error("Error in /find-quietest-spot:", error);
+        res.status(500).json({ error: 'Failed to process request.' });
+    }
+});
+
+
+// --- Server Start ---
 app.listen(port, () => {
-    console.log(`Server started listening on: ${port}`);
+    console.log(`Server started listening on: http://localhost:${port}`);
 });
 
