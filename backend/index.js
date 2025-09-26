@@ -1,43 +1,85 @@
 const express = require("express");
+const fs = require('fs');
+const path = require('path');
+const { randomUUID } = require('crypto');
+
 const app = express();
 const port = 6969;
+const dbPath = path.join(__dirname, 'database.json');
 
+// Middleware to parse JSON for other routes if needed in the future
 app.use(express.json());
 
+// A simple root route
 app.get('/', (req, res) => {
     res.send('Sure :)');
-    console.log("Got a request on `/`. responded accordingly.");
+    console.log("Got a request on `/`. Responded accordingly.");
 });
 
-app.get("/getmap", (req,res) => {
-const encryptedData = req.query.data;
-console.log("Got a request of get maps");
- if (!encryptedData) {
+// **RENAMED ROUTE**: This route now sends all data points to the client (e.g., for a heatmap)
+app.get('/getmap', (req, res) => {
+    fs.readFile(dbPath, 'utf8', (err, data) => {
+        if (err) { 
+            console.error("Error reading database:", err);
+            return res.status(500).json({ error: 'Could not read from database.' }); 
+        }
+        res.status(200).json(JSON.parse(data));
+    });
+});
+
+// **RENAMED ROUTE**: This route now receives data from a client and saves it
+app.get('/givedata', (req, res) => {
+    const encryptedData = req.query.data;
+    if (!encryptedData) {
         return res.status(400).json({ error: 'No data provided in the query.' });
     }
 
     try {
-        // 2. "Decrypt" the Base64 string back into a regular JSON string.
-        // Node.js uses the Buffer object for this.
+        // 1. Decode and parse the data from the client
         const jsonString = Buffer.from(encryptedData, 'base64').toString('utf8');
-        
-        // 3. Parse the JSON string into a usable JavaScript object.
-        const decryptedData = JSON.parse(jsonString);
+        const clientData = JSON.parse(jsonString);
+        console.log('Decrypted User Data Received:', clientData);
 
-        console.log('Decrypted User Data Received:', decryptedData);
+        // 2. Create the new entry for the database, adding a server-generated ID
+        const newEntry = {
+            id: randomUUID(),
+            latitude: clientData.latitude,
+            longitude: clientData.longitude,
+            dataPoint: clientData.data, // Map 'data' from client to 'dataPoint' in the DB
+            timestamp: clientData.timestamp
+        };
 
-        // 4. Send a success response back to the client with the decrypted data.
-        res.status(200).json({
-            message: 'Encrypted data received and decrypted successfully!',
-            dataYouSent: decryptedData
+        // 3. Read the existing database file
+        fs.readFile(dbPath, 'utf8', (readErr, data) => {
+            if (readErr) {
+                console.error("Error reading database:", readErr);
+                return res.status(500).json({ error: 'Could not read database to save new point.' });
+            }
+
+            const database = JSON.parse(data);
+            database.push(newEntry);
+
+            // 4. Write the updated data back to the file
+            fs.writeFile(dbPath, JSON.stringify(database, null, 2), (writeErr) => {
+                if (writeErr) {
+                    console.error("Error writing to database:", writeErr);
+                    return res.status(500).json({ error: 'Could not save new point to database.' });
+                }
+
+                // 5. Send a success response after the data is saved
+                res.status(200).json({
+                    message: 'Data received and appended to database successfully!',
+                    appendedData: newEntry
+                });
+            });
         });
 
     } catch (error) {
         console.error("Failed to decode or parse data:", error);
-        res.status(500).json({ error: 'Invalid data format. Could not decrypt.' });
+        res.status(500).json({ error: 'Invalid data format.' });
     }
-
 });
+
 app.listen(port, () => {
     console.log(`Server started listening on: ${port}`);
 });
