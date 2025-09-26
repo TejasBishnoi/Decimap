@@ -53,6 +53,7 @@
             max-width: 500px;
             text-align: left;
             min-height: 50px;
+            word-break: break-all;
         }
     </style>
 </head>
@@ -60,7 +61,7 @@
 
     <div class="container">
         <h1>Server Test Client</h1>
-        <button id="sendRequestBtn">Send POST to /getmap</button>
+        <button id="sendRequestBtn">Send GET with Encrypted Query</button>
         <div id="response">Server response will appear here...</div>
     </div>
 
@@ -68,12 +69,8 @@
         const sendButton = document.getElementById('sendRequestBtn');
         const responseDiv = document.getElementById('response');
 
-        async function sendLocationData() {
-            // The URL of your server's '/getmap' endpoint
-            const url = 'http://10.6.116.54:6969/getmap';
-
-            // This is the sample location data we will send in the body.
-            // Your server will receive this as `currentusrloc`.
+        async function sendEncryptedLocationData() {
+            // This is the sample location data.
             const locationData = {
                 latitude: 28.7041,
                 longitude: 77.1025,
@@ -81,15 +78,23 @@
                 timestamp: new Date().toISOString()
             };
 
+            // 1. Convert the JavaScript object to a JSON string.
+            const jsonString = JSON.stringify(locationData);
+
+            // 2. "Encrypt" the JSON string using Base64 encoding.
+            // btoa() is a built-in browser function for this.
+            const encryptedData = btoa(jsonString);
+            
+            // 3. Create the new URL with the encrypted data as a query parameter.
+            const url = `http://10.6.116.54:6969/getmap?data=${encryptedData}`;
+
+            console.log("Sending to URL:", url);
             responseDiv.textContent = 'Sending request...';
 
             try {
+                // 4. Send the GET request. Note there is no body or headers for content-type.
                 const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(locationData)
+                    method: 'GET'
                 });
 
                 const responseData = await response.json();
@@ -103,8 +108,8 @@
             }
         }
 
-        // Attach the function to the button's click event
-        sendButton.addEventListener('click', sendLocationData);
+        // Attach the new function to the button's click event
+        sendButton.addEventListener('click', sendEncryptedLocationData);
     </script>
 
 </body>
