@@ -3,115 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Map API Test Client</title>
+    <title>Client to Test Server</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #2c2f33;
-            color: #ffffff;
-            margin: 0;
-            flex-direction: column;
-        }
-        .container {
-            text-align: center;
-            padding: 2rem;
-            background-color: #23272a;
-            border-radius: 12px;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-        }
-        h1 {
-            margin-bottom: 1.5rem;
-        }
-        button {
-            padding: 12px 24px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            border: none;
-            background-color: #7289da;
-            color: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: background-color 0.2s ease-in-out;
-        }
-        button:hover {
-            background-color: #5f73bc;
-        }
-        #response {
-            margin-top: 20px;
-            padding: 15px;
-            background-color: #1e2124;
-            border-radius: 8px;
-            border: 1px solid #42464d;
-            font-family: 'Courier New', Courier, monospace;
-            white-space: pre-wrap;
-            width: 100%;
-            max-width: 500px;
-            text-align: left;
-            min-height: 50px;
-            word-break: break-all;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: #f0f2f5; margin: 0; }
+        button { font-size: 1.2rem; padding: 12px 24px; border-radius: 8px; border: none; background-color: #007bff; color: white; cursor: pointer; transition: background-color 0.3s; }
+        button:hover { background-color: #0056b3; }
+        #response { margin-top: 20px; padding: 15px; background-color: #e9ecef; border-radius: 8px; width: 80%; max-width: 600px; white-space: pre-wrap; word-wrap: break-word; font-family: "Courier New", Courier, monospace; }
+        h1 { color: #333; }
     </style>
 </head>
 <body>
-
-    <div class="container">
-        <h1>Server Test Client</h1>
-        <button id="sendRequestBtn">Send GET with Encrypted Query</button>
-        <div id="response">Server response will appear here...</div>
-    </div>
+    <h1>Client Test Page</h1>
+    <button onclick="sendRequest()">Send Data to /getmap</button>
+    <div id="response">Server response will appear here...</div>
 
     <script>
-        const sendButton = document.getElementById('sendRequestBtn');
-        const responseDiv = document.getElementById('response');
-
-        async function sendEncryptedLocationData() {
-            // This is the sample location data.
-            const locationData = {
-                latitude: 28.7041,
-                longitude: 77.1025,
-                accuracy: 15,
-                timestamp: new Date().toISOString()
-            };
-
-            // 1. Convert the JavaScript object to a JSON string.
-            const jsonString = JSON.stringify(locationData);
-
-            // 2. "Encrypt" the JSON string using Base64 encoding.
-            // btoa() is a built-in browser function for this.
-            const encryptedData = btoa(jsonString);
-            
-            // 3. Create the new URL with the encrypted data as a query parameter.
-            const url = `http://10.6.116.54:6969/getmap?data=${encryptedData}`;
-
-            console.log("Sending to URL:", url);
+        async function sendRequest() {
+            const responseDiv = document.getElementById('response');
             responseDiv.textContent = 'Sending request...';
 
             try {
-                // 4. Send the GET request. Note there is no body or headers for content-type.
-                const response = await fetch(url, {
-                    method: 'GET'
-                });
+                // 1. Create the data object with the specified structure
+                const dataToSend = {
+                    latitude: 28.6272, // Sample latitude for testing (e.g., near Connaught Place)
+                    longitude: 77.2158, // Sample longitude for testing
+                    data: `${Math.floor(Math.random() * 30) + 10}db`, // A random data point like "25db"
+                    timestamp: new Date().toISOString() // The current time in UTC format
+                };
 
-                const responseData = await response.json();
+                // 2. Stringify the object to JSON
+                const jsonString = JSON.stringify(dataToSend);
+
+                // 3. "Encrypt" the JSON string using Base64 encoding
+                const encryptedData = btoa(jsonString);
+
+                // 4. Send the data as a query parameter in a GET request
+                const response = await fetch(`http://10.6.116.54:6969/givedata?data=${encodeURIComponent(encryptedData)}`);
                 
-                // Display the server's response in a readable format
-                responseDiv.textContent = JSON.stringify(responseData, null, 2);
+                const result = await response.json();
+                
+                responseDiv.textContent = 'Response from server:\n' + JSON.stringify(result, null, 2);
 
             } catch (error) {
-                console.error('Request failed:', error);
-                responseDiv.textContent = 'Error: Could not connect to the server. Is it running on port 6969?';
+                console.error('Error:', error);
+                responseDiv.textContent = 'Failed to send request. Is the server running?';
             }
         }
-
-        // Attach the new function to the button's click event
-        sendButton.addEventListener('click', sendEncryptedLocationData);
     </script>
-
 </body>
 </html>
 
