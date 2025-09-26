@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>India Map Explorer</title>
+    <title>Decimap - India Map Explorer</title>
     <!-- Include Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <!-- Include Leaflet JS -->
@@ -11,25 +11,52 @@
     <!-- Include Leaflet Heat plugin -->
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     <style>
+        body { margin: 0; }
+        header {
+            background: #1a252f;
+            color: white;
+            text-align: center;
+            padding: 15px;
+            font-size: 24px;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1100;
+        }
         #map {
-            height: 100vh;
+            height: calc(100vh - 80px - 50px); /* Subtract header and footer heights */
             width: calc(100% - 300px);
             margin-left: 300px;
+            margin-top: 80px; /* Offset for header */
         }
         #sidebar {
-            position: absolute;
-            top: 0;
+            position: fixed;
+            top: 80px; /* Below header */
             left: 0;
             width: 300px;
-            height: 100%;
+            height: calc(100vh - 80px - 50px); /* Subtract header and footer */
             overflow-y: auto;
             z-index: 1000;
+        }
+        footer {
+            background: linear-gradient(to right, #007bff, #00b7eb);
+            color: white;
+            text-align: center;
+            padding: 15px;
+            position: fixed;
+                    width: 100%;
+            bottom: 0;
+            height: 50px;
+            z-index: 1100;
         }
     </style>
 </head>
 <body>
+    <header>
+        🌍 Decimap
+    </header>
     <div id="sidebar">
-        <h1>India Map Explorer</h1>
+        <h1>Decimap India Explorer</h1>
         <div>
             <p><strong>Reference:</strong> Amity University Haryana (28.3185, 76.9137)</p>
             <p>Explore India! Right-click to pin locations. Heatmap shows simulated noise levels (50-80 dB).</p>
@@ -78,6 +105,9 @@
         </div>
     </div>
     <div id="map"></div>
+    <footer>
+        Developed by Team Byte Bandits
+    </footer>
 
     <script>
         // Amity University Haryana coordinates (for reference)
@@ -85,7 +115,7 @@
         const AMITY_LNG = 76.9137;
 
         // Initialize the map to show all of India
-        let map = L.map('map').setView([21.7679, 78.9629], 5); // Center of India, zoom 5
+        let map = L.map('map').setView([21.7679, 78.9629], 5);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
@@ -113,12 +143,12 @@
             const points = [];
             for (let i = 0; i < count; i++) {
                 const angle = Math.random() * Math.PI * 2;
-                const distance = Math.random() * radius; // 1000km radius for India
+                const distance = Math.random() * radius;
                 const latOffset = (distance * Math.cos(angle)) / 111;
                 const lngOffset = (distance * Math.sin(angle)) / (111 * Math.cos(centerLat * Math.PI / 180));
                 const lat = centerLat + latOffset;
                 const lng = centerLng + lngOffset;
-                const noise = 50 + Math.random() * 30; // 50-80 dB
+                const noise = 50 + Math.random() * 30;
                 points.push([lat, lng, noise / 100]);
             }
             return points;
@@ -162,18 +192,12 @@
                 return;
             }
 
-            // Add to pois array
             const newPoi = { lat, lng, name, noise };
             pois.push(newPoi);
-
-            // Add marker
             const marker = L.marker([lat, lng]).bindPopup(`${name}<br>Noise: ${noise} dB`);
             poiMarkers[name] = marker;
-
-            // Update layer based on current filter
             updateNoiseFilter();
 
-            // Clear inputs
             document.getElementById('customLat').value = '';
             document.getElementById('customLng').value = '';
             document.getElementById('customName').value = '';
@@ -182,7 +206,7 @@
 
         // Haversine formula for distance
         function calculateDistance(lat1, lng1, lat2, lng2) {
-            const R = 6371; // Earth's radius in km
+            const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLng = (lng2 - lng1) * Math.PI / 180;
             const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -200,7 +224,7 @@
                 alert('Please enter valid coordinates (Latitude: -90 to 90, Longitude: -180 to 180)');
                 return;
             }
-            map.setView([lat, lng], 10); // Adjusted zoom for city-level view
+            map.setView([lat, lng], 10);
             if (currentMarker) map.removeLayer(currentMarker);
             const distance = calculateDistance(lat, lng, AMITY_LAT, AMITY_LNG);
             currentMarker = L.marker([lat, lng]).addTo(map)
