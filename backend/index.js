@@ -10,6 +10,19 @@ const dbPath = path.join(__dirname, 'database.json');
 // Middleware to parse JSON for other routes if needed in the future
 app.use(express.json());
 
+app.get("/lol", (req,res) =>{
+    const imagePath = path.join(__dirname, 'meme.jpg');
+    // Check if the file exists before trying to send it
+    fs.access(imagePath, fs.constants.F_OK, (err) => {
+        if (err) {
+            console.log("Easter egg image not found!");
+            res.status(404).send("Oops, the easter egg is missing!");
+        } else {
+            res.sendFile(imagePath);
+        }
+    });
+});
+
 // A simple root route
 app.get('/', (req, res) => {
     res.send('Sure :)');
