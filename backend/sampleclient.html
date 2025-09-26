@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Test Client</title>
+    <title>Map API Test Client</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -11,90 +11,102 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
-            background-color: #f0f2f5;
+            background-color: #2c2f33;
+            color: #ffffff;
             margin: 0;
             flex-direction: column;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            background-color: #23272a;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            margin-bottom: 1.5rem;
         }
         button {
             padding: 12px 24px;
             font-size: 16px;
+            font-weight: bold;
             cursor: pointer;
             border: none;
-            background-color: #007bff;
+            background-color: #7289da;
             color: white;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: background-color 0.2s;
+            transition: background-color 0.2s ease-in-out;
         }
         button:hover {
-            background-color: #0056b3;
+            background-color: #5f73bc;
         }
         #response {
             margin-top: 20px;
             padding: 15px;
-            background-color: #fff;
+            background-color: #1e2124;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border: 1px solid #42464d;
             font-family: 'Courier New', Courier, monospace;
             white-space: pre-wrap;
-            width: 80%;
+            width: 100%;
             max-width: 500px;
+            text-align: left;
+            min-height: 50px;
         }
     </style>
 </head>
 <body>
 
-    <button id="sendRequestBtn">Send POST Request to Server</button>
-    <div id="response">Server response will appear here...</div>
+    <div class="container">
+        <h1>Server Test Client</h1>
+        <button id="sendRequestBtn">Send POST to /getmap</button>
+        <div id="response">Server response will appear here...</div>
+    </div>
 
     <script>
-        // Find the button and the response div in the HTML
         const sendButton = document.getElementById('sendRequestBtn');
         const responseDiv = document.getElementById('response');
 
-        // Define the function that will send the data
-        async function sendDataToServer() {
-            // 1. The URL of your server's endpoint
-            const url = 'http://10.6.116.54:6969/getmap';
+        async function sendLocationData() {
+            // The URL of your server's '/getmap' endpoint
+            const url = 'http://localhost:6969/getmap';
 
-            // 2. The sensitive data you want to send
-            const dataToSend = {
-                username: 'alex_hackathon',
-                secretKey: 'super_secret_value_12345',
+            // This is the sample location data we will send in the body.
+            // Your server will receive this as `currentusrloc`.
+            const locationData = {
+                latitude: 28.7041,
+                longitude: 77.1025,
+                accuracy: 15,
                 timestamp: new Date().toISOString()
             };
 
-            console.log('Sending this data to the server:', dataToSend);
             responseDiv.textContent = 'Sending request...';
 
             try {
-                // 3. Use the fetch API to make the POST request
                 const response = await fetch(url, {
-                    method: 'POST', // Specify the method
+                    method: 'POST',
                     headers: {
-                        // Tell the server we're sending JSON
                         'Content-Type': 'application/json'
                     },
-                    // Convert the JavaScript object to a JSON string for the body
-                    body: JSON.stringify(dataToSend)
+                    body: JSON.stringify(locationData)
                 });
 
-                // 4. Wait for the server's response and parse it as JSON
                 const responseData = await response.json();
                 
-                console.log('Received response from server:', responseData);
                 // Display the server's response in a readable format
                 responseDiv.textContent = JSON.stringify(responseData, null, 2);
 
             } catch (error) {
-                console.error('Failed to send request:', error);
-                responseDiv.textContent = 'Error: Could not connect to the server. Is it running?';
+                console.error('Request failed:', error);
+                responseDiv.textContent = 'Error: Could not connect to the server. Is it running on port 6969?';
             }
         }
 
-        // 5. Add a click event listener to the button
-        sendButton.addEventListener('click', sendDataToServer);
+        // Attach the function to the button's click event
+        sendButton.addEventListener('click', sendLocationData);
     </script>
 
 </body>
 </html>
+
