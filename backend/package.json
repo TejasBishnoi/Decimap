@@ -11,5 +11,8 @@
     "url": "github.com/TejasBishnoi/Decimap"
   },
   "author": "Bytes Bandits",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
 }
