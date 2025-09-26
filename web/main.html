@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Decimap - Visualize the Soundscape of India</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+
+    <!-- Three.js Library for 3D animation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            background-color: #0c0a09;
+            /* New: Subtle background gradient */
+            background-image: radial-gradient(ellipse at center, rgba(245, 158, 11, 0.1) 0%, #0c0a09 70%);
+        }
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        .content-wrapper {
+            position: relative;
+            z-index: 1;
+        }
+        .hero-text {
+            animation: fadeInDown 1s ease-out;
+        }
+        .cta-button {
+            animation: fadeInUp 1s ease-out 0.5s;
+            animation-fill-mode: backwards;
+        }
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .glass-effect {
+            background: rgba(12, 10, 9, 0.6); /* Semi-transparent background */
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            /* New: Added transition for hover effect */
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        /* New: Hover glow effect for feature cards */
+        .glass-effect:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 0 30px rgba(245, 158, 11, 0.3);
+        }
+        .avatar-circle {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            background: rgba(12, 10, 9, 0.6);
+            border: 2px solid rgba(245, 158, 11, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .avatar-circle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+        }
+        /* Scroll Animation */
+        .scroll-reveal {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+        }
+        .scroll-reveal.is-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        /* New: Class for gradient text */
+        .text-gradient {
+            background: linear-gradient(to right, #facc15, #f59e0b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="bg-stone-900 text-gray-200">
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="content-wrapper">
+        <header class="p-6">
+            <h1 class="text-2xl font-bold text-amber-400">🌍 Decimap</h1>
+        </header>
+
+        <main class="min-h-screen flex items-center justify-center text-center px-4">
+            <div class="max-w-4xl">
+                <div class="hero-text">
+                    <h2 class="text-5xl md:text-7xl lg:text-8xl font-black uppercase">
+                        Visualize The <span class="text-gradient">Soundscape</span>
+                    </h2>
+                    <p class="mt-6 text-lg md:text-xl text-gray-400 max-w-2xl mx-auto">
+                        Decimap is a live, crowd-sourced noise pollution map of India. Explore real-time data, find quiet locations, and contribute to a growing environmental dataset.
+                    </p>
+                </div>
+                
+                <div class="cta-button mt-12">
+                    <a href="heatmap.html" 
+                       class="inline-block bg-amber-400 text-stone-900 font-bold text-lg px-10 py-4 rounded-lg shadow-lg transition-transform transform hover:scale-105 hover:shadow-amber-400/50">
+                        Launch Heatmap App
+                    </a>
+                </div>
+            </div>
+        </main>
+
+        <section id="features" class="py-20 px-4">
+            <div class="max-w-5xl mx-auto">
+                <h3 class="text-4xl font-bold text-center mb-12 scroll-reveal">Features</h3>
+                <div class="grid md:grid-cols-3 gap-8">
+                    <!-- Feature 1 -->
+                    <div class="glass-effect p-8 rounded-xl text-center scroll-reveal">
+                        <div class="text-5xl mb-4">🌡️</div>
+                        <h4 class="text-xl font-semibold mb-2 text-amber-400">Live Heatmap</h4>
+                        <p class="text-gray-400">See noise levels across the country updated with data from users like you.</p>
+                    </div>
+                    <!-- Feature 2 -->
+                    <div class="glass-effect p-8 rounded-xl text-center scroll-reveal" style="transition-delay: 200ms;">
+                        <div class="text-5xl mb-4">🎧</div>
+                        <h4 class="text-xl font-semibold mb-2 text-amber-400">Find Quiet Spots</h4>
+                        <p class="text-gray-400">Use your location to find the nearest area with the lowest recorded decibel level.</p>
+                    </div>
+                    <!-- Feature 3 -->
+                    <div class="glass-effect p-8 rounded-xl text-center scroll-reveal" style="transition-delay: 400ms;">
+                        <div class="text-5xl mb-4">📡</div>
+                        <h4 class="text-xl font-semibold mb-2 text-amber-400">Contribute Data</h4>
+                        <p class="text-gray-400">Become a citizen scientist by submitting noise readings from your own location.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- NEW Community Section -->
+        <section id="community" class="py-20 px-4 text-center">
+            <div class="max-w-5xl mx-auto">
+                <h3 class="text-4xl font-bold mb-4 scroll-reveal">Powered by a Community of</h3>
+                <h4 class="text-5xl md:text-6xl font-black text-gradient mb-12 scroll-reveal">Citizen Scientists</h4>
+                <div class="flex justify-center flex-wrap gap-8">
+                    <!-- Avatar examples -->
+                    <div class="scroll-reveal" style="transition-delay: 100ms;">
+                        <div class="avatar-circle">🧑‍🚀</div>
+                    </div>
+                    <div class="scroll-reveal" style="transition-delay: 200ms;">
+                        <div class="avatar-circle">🧑‍🔬</div>
+                    </div>
+                    <div class="scroll-reveal" style="transition-delay: 300ms;">
+                        <div class="avatar-circle">🧑‍💻</div>
+                    </div>
+                     <div class="scroll-reveal" style="transition-delay: 400ms;">
+                        <div class="avatar-circle">🧑‍🎨</div>
+                    </div>
+                    <div class="scroll-reveal" style="transition-delay: 500ms;">
+                        <div class="avatar-circle">🫵</div>
+                    </div>
+                </div>
+                <p class="mt-12 text-lg text-gray-400 max-w-2xl mx-auto scroll-reveal">
+                    Our map is built by people just like you, contributing data to create a clearer picture of our environment. Join us and make an impact.
+                </p>
+            </div>
+        </section>
+
+
+        <footer class="text-center p-6 border-t border-gray-800">
+            <p>&copy; 2025 Decimap by Team Byte Bandits</p>
+        </footer>
+    </div>
+
+    <script>
+        // --- Three.js 3D Background Animation ---
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas') });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.position.z = 5;
+
+        // Particle system
+        const particlesGeometry = new THREE.BufferGeometry();
+        const particlesCount = 5000;
+        const posArray = new Float32Array(particlesCount * 3); // x, y, z
+        const colors = new Float32Array(particlesCount * 3); // r, g, b
+
+        const baseColor = new THREE.Color(0xf59e0b); // Base amber color
+
+        for (let i = 0; i < particlesCount; i++) {
+            const i3 = i * 3;
+            posArray[i3] = (Math.random() - 0.5) * 15; // x
+            posArray[i3 + 1] = 0; // y will be animated
+            posArray[i3 + 2] = (Math.random() - 0.5) * 15; // z
+
+            // New: Add color variation
+            const mixedColor = baseColor.clone();
+            mixedColor.lerp(new THREE.Color(0xffffff), Math.random() * 0.3); // Mix with white for brightness variation
+            colors[i3] = mixedColor.r;
+            colors[i3 + 1] = mixedColor.g;
+            colors[i3 + 2] = mixedColor.b;
+        }
+
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const particlesMaterial = new THREE.PointsMaterial({
+            size: 0.02,
+            transparent: true,
+            opacity: 0.8,
+            blending: THREE.AdditiveBlending,
+            vertexColors: true // Use vertex colors
+        });
+
+        const particleMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+        scene.add(particleMesh);
+
+        // Mouse interaction
+        let mouseX = 0;
+        let mouseY = 0;
+        document.addEventListener('mousemove', (event) => {
+            mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+            mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        // Animation loop
+        const clock = new THREE.Clock();
+        function animate() {
+            const elapsedTime = clock.getElapsedTime();
+            
+            const positions = particlesGeometry.attributes.position.array;
+            for (let i = 0; i < particlesCount; i++) {
+                const i3 = i * 3;
+                const x = positions[i3];
+                const z = positions[i3 + 2];
+                const distance = Math.sqrt(x * x + z * z);
+                positions[i3 + 1] = Math.sin(distance * 2 - elapsedTime * 2) * 0.2;
+            }
+            particlesGeometry.attributes.position.needsUpdate = true;
+
+
+            camera.position.x += (mouseX * 0.5 - camera.position.x) * 0.02;
+            camera.position.y += (mouseY * 0.5 - camera.position.y) * 0.02;
+            camera.lookAt(scene.position);
+            
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- Scroll Animation ---
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('is-visible');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.scroll-reveal').forEach(el => {
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>
+
