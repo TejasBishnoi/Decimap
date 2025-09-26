@@ -3,9 +3,283 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Enhanced Map - Amity University Haryana</title>
+    <!-- Include Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Include Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Include Leaflet Heat plugin -->
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <style>
+        #map {
+            height: 100vh;
+            width: calc(100% - 300px);
+            margin-left: 300px;
+        }
+        #sidebar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 300px;
+            height: 100%;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+    </style>
 </head>
 <body>
-    
+    <div id="sidebar">
+        <h1>Amity University Haryana Map</h1>
+        <div>
+            <p><strong>Campus:</strong> Panchgaon, Manesar, Gurugram (28.3185, 76.9137)</p>
+            <p>Right-click (or long-press on mobile) to pin locations. Heatmap shows simulated noise levels (50-80 dB).</p>
+        </div>
+        <div>
+            <label for="latitude">Latitude:</label>
+            <input type="number" id="latitude" step="any" placeholder="e.g., 28.3185" />
+            <label for="longitude">Longitude:</label>
+            <input type="number" id="longitude" step="any" placeholder="e.g., 76.9137" />
+            <button onclick="updateMap()">Update Map</button>
+        </div>
+        <div>
+            <button onclick="getCurrentLocation()">Use My Location</button>
+        </div>
+        <div>
+            <label for="search">Search Place:</label>
+            <input type="text" id="search" placeholder="e.g., Manesar Bus Stand" />
+            <button onclick="searchLocation()">Search</button>
+        </div>
+        <div>
+            <h3>Add Custom Location</h3>
+            <label for="customLat">Lat:</label>
+            <input type="number" id="customLat" step="any" placeholder="e.g., 28.3200" />
+            <label for="customLng">Lng:</label>
+            <input type="number" id="customLng" step="any" placeholder="e.g., 76.9150" />
+            <label for="customName">Name:</label>
+            <input type="text" id="customName" placeholder="e.g., My Spot" />
+            <label for="customNoise">Noise (dB):</label>
+            <input type="number" id="customNoise" min="0" max="100" placeholder="e.g., 60" />
+            <button onclick="addCustomLocation()">Add Custom POI</button>
+        </div>
+        <div>
+            <label for="noiseFilter">Max Noise Level (dB):</label>
+            <input type="range" id="noiseFilter" min="0" max="100" value="100" oninput="updateNoiseFilter()" />
+            <span id="noiseValue">100</span>
+        </div>
+        <div>
+            <label>
+                <input type="checkbox" id="poiToggle" checked onchange="togglePOI()" /> Show Nearby POIs
+            </label>
+        </div>
+        <div>
+            <label>
+                <input type="checkbox" id="heatToggle" checked onchange="toggleHeat()" /> Show Noise Heatmap
+            </label>
+        </div>
+    </div>
+    <div id="map"></div>
+
+    <script>
+        // Amity University Haryana coordinates
+        const AMITY_LAT = 28.3185;
+        const AMITY_LNG = 76.9137;
+
+        // Initialize the map
+        let map = L.map('map').setView([AMITY_LAT, AMITY_LNG], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Current marker
+        let currentMarker = null;
+
+        // POI Layer Group (with noise levels)
+        let poiLayer = L.layerGroup();
+        let poiMarkers = {}; // To track individual markers for filtering
+
+        // Define default POIs with simulated noise levels (based on Gurugram averages ~52-71 dB)
+        let pois = [
+            { lat: 28.3350, lng: 76.9200, name: 'Nainwal Village (2km from campus)', noise: 55 },
+            { lat: 28.4200, lng: 76.9500, name: 'Dhorka Locality (10km from campus)', noise: 65 },
+            { lat: 28.3500, lng: 76.9400, name: 'Manesar City Center', noise: 70 }
+        ];
+
+        // Heatmap layer
+        let heatLayer = null;
+        let heatPoints = [];
+
+        // Generate simulated noise points for heatmap (50 points around campus, 50-80 dB normalized to 0-1 intensity)
+        function generateNoisePoints(centerLat, centerLng, count, radius) {
+            const points = [];
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.random() * radius;
+                const latOffset = (distance * Math.cos(angle)) / 111; // Approx km to degrees
+                const lngOffset = (distance * Math.sin(angle)) / (111 * Math.cos(centerLat * Math.PI / 180));
+                const lat = centerLat + latOffset;
+                const lng = centerLng + lngOffset;
+                const noise = 50 + Math.random() * 30; // 50-80 dB
+                points.push([lat, lng, noise / 100]); // Normalize intensity 0.5-0.8
+            }
+            return points;
+        }
+
+        heatPoints = generateNoisePoints(AMITY_LAT, AMITY_LNG, 50, 5); // 5km radius
+        heatLayer = L.heatLayer(heatPoints, { radius: 25, maxZoom: 17 }).addTo(map);
+
+        // Add POI markers (for default and custom)
+        function addPOIMarkers() {
+            pois.forEach(poi => {
+                const marker = L.marker([poi.lat, poi.lng]).bindPopup(`${poi.name}<br>Noise: ${poi.noise} dB`);
+                poiMarkers[poi.name] = marker;
+                poiLayer.addLayer(marker);
+            });
+        }
+        addPOIMarkers();
+        map.addLayer(poiLayer);
+
+        // Initial marker for Amity
+        currentMarker = L.marker([AMITY_LAT, AMITY_LNG]).addTo(map)
+            .bindPopup('Amity University Haryana, Gurugram')
+            .openPopup();
+
+        // Pin location on right-click (or long-press simulation)
+        map.on('contextmenu', function(e) {
+            const pinnedMarker = L.marker(e.latlng).addTo(map)
+                .bindPopup(`Pinned Location<br>Lat: ${e.latlng.lat.toFixed(4)}, Lng: ${e.latlng.lng.toFixed(4)}<br>Distance to Amity: ${calculateDistance(e.latlng.lat, e.latlng.lng, AMITY_LAT, AMITY_LNG)} km`)
+                .openPopup();
+        });
+
+        // Function to add custom location
+        function addCustomLocation() {
+            const lat = parseFloat(document.getElementById('customLat').value);
+            const lng = parseFloat(document.getElementById('customLng').value);
+            const name = document.getElementById('customName').value.trim();
+            const noise = parseInt(document.getElementById('customNoise').value) || 0;
+
+            if (isNaN(lat) || isNaN(lng) || !name) {
+                alert('Please enter valid latitude, longitude, and name.');
+                return;
+            }
+
+            // Add to pois array
+            const newPoi = { lat, lng, name, noise };
+            pois.push(newPoi);
+
+            // Add marker
+            const marker = L.marker([lat, lng]).bindPopup(`${name}<br>Noise: ${noise} dB`);
+            poiMarkers[name] = marker;
+
+            // Update layer based on current filter
+            updateNoiseFilter();
+
+            // Clear inputs
+            document.getElementById('customLat').value = '';
+            document.getElementById('customLng').value = '';
+            document.getElementById('customName').value = '';
+            document.getElementById('customNoise').value = '';
+        }
+
+        // Haversine formula for distance
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return (R * c).toFixed(2);
+        }
+
+        // Update map with custom coords
+        function updateMap() {
+            const lat = parseFloat(document.getElementById('latitude').value);
+            const lng = parseFloat(document.getElementById('longitude').value);
+            if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                alert('Please enter valid coordinates (Latitude: -90 to 90, Longitude: -180 to 180)');
+                return;
+            }
+            map.setView([lat, lng], 15);
+            if (currentMarker) map.removeLayer(currentMarker);
+            const distance = calculateDistance(lat, lng, AMITY_LAT, AMITY_LNG);
+            currentMarker = L.marker([lat, lng]).addTo(map)
+                .bindPopup(`Location:<br>Lat: ${lat}, Lng: ${lng}<br>Distance to Amity: ${distance} km`)
+                .openPopup();
+        }
+
+        // Geolocation
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    document.getElementById('latitude').value = lat;
+                    document.getElementById('longitude').value = lng;
+                    updateMap();
+                }, () => alert('Geolocation failed. Check permissions.'));
+            } else {
+                alert('Geolocation not supported by this browser.');
+            }
+        }
+
+        // Search with Nominatim
+        function searchLocation() {
+            const query = document.getElementById('search').value;
+            if (!query) return;
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        const lat = parseFloat(data[0].lat);
+                        const lng = parseFloat(data[0].lon);
+                        document.getElementById('latitude').value = lat;
+                        document.getElementById('longitude').value = lng;
+                        updateMap();
+                    } else {
+                        alert('No results found for the search query.');
+                    }
+                })
+                .catch(() => alert('Search failed. Check your connection.'));
+        }
+
+        // Update noise filter
+        function updateNoiseFilter() {
+            const maxNoise = parseInt(document.getElementById('noiseFilter').value);
+            document.getElementById('noiseValue').textContent = maxNoise;
+            // Clear POI layer
+            poiLayer.clearLayers();
+            // Add back filtered markers
+            pois.forEach(poi => {
+                if (poi.noise <= maxNoise) {
+                    if (!poiMarkers[poi.name]) {
+                        // Create marker if not exists (for new customs)
+                        poiMarkers[poi.name] = L.marker([poi.lat, poi.lng]).bindPopup(`${poi.name}<br>Noise: ${poi.noise} dB`);
+                    }
+                    poiLayer.addLayer(poiMarkers[poi.name]);
+                }
+            });
+        }
+
+        // Toggle POIs
+        function togglePOI() {
+            const checkbox = document.getElementById('poiToggle');
+            if (checkbox.checked) {
+                map.addLayer(poiLayer);
+            } else {
+                map.removeLayer(poiLayer);
+            }
+        }
+
+        // Toggle Heatmap
+        function toggleHeat() {
+            const checkbox = document.getElementById('heatToggle');
+            if (checkbox.checked) {
+                map.addLayer(heatLayer);
+            } else {
+                map.removeLayer(heatLayer);
+            }
+        }
+    </script>
 </body>
 </html>
