@@ -13,7 +13,7 @@
     
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 
     <style>
@@ -65,7 +65,7 @@
             text-fill-color: transparent;
         }
 
-        /* New: Styles for the heatmap legend */
+        /* Styles for the heatmap legend */
         .leaflet-control-legend {
             background: rgba(12, 10, 9, 0.85);
             padding: 10px;
@@ -160,6 +160,8 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // Point to the local backend server. This ensures fetch requests work correctly.
+            const API_BASE_URL = 'http://localhost:6969';
             let userCoords = null;
             let quietestSpotMarker = null;
             let locationMarker = null;
@@ -178,7 +180,7 @@
             const modal = document.getElementById('modal');
             const modalContent = modal.querySelector('div');
 
-            // --- NEW: Heatmap Legend ---
+            // --- HEATMAP LEGEND ---
             const legend = L.control({ position: 'bottomright' });
             legend.onAdd = function (map) {
                 const div = L.DomUtil.create('div', 'leaflet-control-legend');
@@ -199,15 +201,24 @@
                 setLoadingState(document.getElementById('refresh-btn'), true, 'Refreshing...');
                 dataStatus.textContent = 'Fetching live data...';
                 try {
-                    const response = await fetch('/getmap');
+                    const response = await fetch(`${API_BASE_URL}/getmap`);
                     if (!response.ok) throw new Error(`Server Error: ${response.status}`);
                     const dataPoints = await response.json();
                     
-                    const heatPoints = dataPoints.map(p => [p.latitude, p.longitude, (parseFloat(p.dataPoint) || 0) / 120]);
+                    const heatPoints = dataPoints.map(p => {
+                        const noiseValue = parseFloat(p.dataPoint);
+                        if (isNaN(noiseValue) || !p.latitude || !p.longitude) {
+                            console.warn("Skipping invalid data point:", p);
+                            return null;
+                        }
+                        return [p.latitude, p.longitude, noiseValue / 120.0];
+                    }).filter(p => p !== null);
+
                     heatLayer.setLatLngs(heatPoints);
                     dataStatus.textContent = `${dataPoints.length} data points loaded.`;
                 } catch (error) {
                     showModal('Connection Error', "Failed to fetch heatmap data. Please ensure the backend server is running and accessible.");
+                    console.error("Fetch Error:", error);
                 } finally {
                     setLoadingState(document.getElementById('refresh-btn'), false, 'Refresh Data');
                 }
@@ -222,7 +233,7 @@
                 if (quietestSpotMarker) map.removeLayer(quietestSpotMarker);
 
                 try {
-                    const response = await fetch(`/find-quietest-spot?lat=${userCoords.lat}&lon=${userCoords.lng}`);
+                    const response = await fetch(`${API_BASE_URL}/find-quietest-spot?lat=${userCoords.lat}&lon=${userCoords.lng}`);
                     const result = await response.json();
 
                     if (!response.ok) throw new Error(result.message || 'Could not find a quiet spot nearby. Try contributing more data!');
@@ -256,7 +267,7 @@
                 
                 setLoadingState(document.getElementById('submit-data-btn'), true, 'Submitting...');
                 try {
-                    const response = await fetch(`/givedata?data=${encodeURIComponent(encodedData)}`);
+                    const response = await fetch(`${API_BASE_URL}/givedata?data=${encodeURIComponent(encodedData)}`);
                     const result = await response.json();
 
                     if (!response.ok) throw new Error(result.error || 'Submission failed.');
@@ -321,7 +332,8 @@
                     },
                     (error) => {
                         showModal('Geolocation Error', error.code === 1 ? "Permission denied. Please enable location services in your browser settings." : "Could not determine your location.");
-                    }
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                 );
                 setLoadingState(btn, false, 'Pin My Location');
             }
@@ -346,7 +358,7 @@
             // Easter Egg
             document.getElementById('easter-egg-trigger').addEventListener('click', (e) => {
                 e.preventDefault();
-                window.open('/lol', '_blank');
+                window.open(`${API_BASE_URL}/lol`, '_blank');
             });
 
             // --- INITIAL LOAD ---

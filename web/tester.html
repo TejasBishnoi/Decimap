@@ -69,10 +69,9 @@
 
         <!-- Settings Section -->
         <div class="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <!-- NEW: Server URL Input -->
             <div>
-                <label for="server-url-input" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Server URL</label>
-                <input id="server-url-input" type="text" value="http://127.0.0.1:6969/givedata" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+                <label for="server-url-input" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Backend Base URL</label>
+                <input id="server-url-input" type="text" value="http://localhost:6969" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
             </div>
             <div>
                 <label for="gain-slider" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white flex justify-between">Gain <span id="gain-value">1.0x</span></label>
@@ -85,7 +84,7 @@
         </div>
 
         <div>
-            <label for="json-output" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Data to Send</label>
+            <label for="json-output" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Data to Send (Backend Format)</label>
             <pre id="json-output" class="w-full h-40 p-4 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-xs overflow-auto"><code>{}</code></pre>
         </div>
 
@@ -109,7 +108,7 @@
         const gainSlider = document.getElementById('gain-slider');
         const gainValueDisplay = document.getElementById('gain-value');
         const baselineInput = document.getElementById('baseline-input');
-        const serverUrlInput = document.getElementById('server-url-input'); // Get the new input
+        const serverUrlInput = document.getElementById('server-url-input');
 
         let audioContext, analyser, mediaStreamSource, gainNode;
         let animationFrameId;
@@ -206,43 +205,42 @@
             if (calibratedDb > maxDecibel) maxDecibel = calibratedDb;
             maxDecibelDisplay.textContent = maxDecibel;
 
-            updateJsonOutput(rawDb, calibratedDb, avg, maxDecibel);
+            updateJsonOutput(calibratedDb);
 
             animationFrameId = requestAnimationFrame(updateDecibels);
         }
 
-        function updateJsonOutput(raw, current, average, max) {
+        // --- MODIFIED: This function now creates the simple JSON format the backend expects. ---
+        function updateJsonOutput(current) {
             const data = {
-                timestamp: new Date().toISOString(),
-                location: locationData,
-                decibel: {
-                    raw: raw,
-                    current: current,
-                    average: average,
-                    max: max,
-                    baseline: calibrationBaseline,
-                    gain: gainNode ? gainNode.gain.value : 1
-                }
+                latitude: locationData ? locationData.latitude : 0,
+                longitude: locationData ? locationData.longitude : 0,
+                data: `${current}db`, // The backend expects a string like "60db"
+                timestamp: new Date().toISOString()
             };
             jsonOutput.textContent = JSON.stringify(data, null, 2);
         }
         
+        // --- MODIFIED: This function now sends a GET request with Base64 encoded data. ---
         async function sendDataToServer() {
             if (!isRecording) return;
-            const jsonData = jsonOutput.textContent;
             const originalStatus = statusDisplay.textContent;
             statusDisplay.textContent = 'Sending data...';
             sendDataButton.disabled = true;
 
-            // UPDATED: Get URL from the input field
-            const serverUrl = serverUrlInput.value;
-
             try {
-                const response = await fetch(serverUrl, { // Use the dynamic URL
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: jsonData
-                });
+                // 1. Get the JSON string from the display.
+                const jsonDataString = jsonOutput.textContent;
+                
+                // 2. Base64 encode the string.
+                const encodedData = btoa(jsonDataString);
+                
+                // 3. Construct the full URL with the query parameter.
+                const baseUrl = serverUrlInput.value;
+                const finalUrl = `${baseUrl}/givedata?data=${encodeURIComponent(encodedData)}`;
+
+                // 4. Send the GET request.
+                const response = await fetch(finalUrl);
                 
                 if (response.ok) {
                     statusDisplay.textContent = 'Data sent successfully!';
@@ -323,7 +321,7 @@
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             if (window.localStream) window.localStream.getTracks().forEach(track => track.stop());
             if(mediaStreamSource) mediaStreamSource.disconnect();
-            if (audioContext && audioContext.state !== 'closed') audio-Context.close();
+            if (audioContext && audioContext.state !== 'closed') audioContext.close();
 
             isRecording = false;
             statusDisplay.textContent = 'Click "Start" to begin measurement.';
@@ -360,3 +358,4 @@
     </script>
 </body>
 </html>
+
